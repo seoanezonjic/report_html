@@ -1,0 +1,3 @@
+module ReportHtml
+  VERSION = "0.1.0"
+end
