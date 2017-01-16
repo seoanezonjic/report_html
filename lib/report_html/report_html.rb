@@ -5,11 +5,13 @@ require 'json'
 JS_FOLDER = File.expand_path(File.join(__FILE__, '..', '..', '..', 'js'))
 
 class Report_html
-	def initialize(hash_vars, title = "report")
+	def initialize(hash_vars, title = "report", data_from_files = false)
 		@all_report = ""
 		@title = title
 		@hash_vars = hash_vars
+		@data_from_files = data_from_files
 		@plots_data = []
+		@count_objects = 0
 	end
 
 	def build(template)
@@ -58,126 +60,307 @@ class Report_html
 	end
 
 	# REPORT SYNTAX METHODS
-	def table(data_id)
+	###################################################################################
+
+	# DATA MANIPULATION METHODS
+	#-------------------------------------------------------------------------------------	
+	def get_data(options)
+		data = []
+		data = extract_data(options)
+		if @data_from_files # If data on container is loaded using html_report as lib, we don't care about data format
+							# if data comes from files and is loaded as strings. We need to format correctly the data.
+			rows = data.length
+			cols = data.first.length
+			if !options[:text]
+				rows.times do |r|
+					cols.times do |c|
+						next if r == 0 && options[:header]
+						next if c == 0 && options[:row_names]
+						data[r][c] = data[r][c].to_f
+					end
+				end
+			end
+		end
+		add_header_row_names(data, options)
+		data = data.transpose if options[:transpose]
+		return data
+	end
+
+	def add_header_row_names(data, options)
+		if options[:add_header_row_names] # This check if html object needs a default header/row_names or not
+			if !options[:header]
+				range = 0..(data.first.length - 1)
+				data.unshift(range.to_a)
+			end
+			if !options[:row_names]
+				data.each_with_index do |row, i|
+					row.unshift(i) 
+				end
+			end
+		end
+	end
+
+	def extract_data(options)
+		data = []
+		ids = options[:id]
+		fields = options[:fields]
+		ids = ids.split(',') if ids.class == String && ids.include?(',') # String syntax
+		if ids.class == Array
+			fields = fields.split(';').map{|data_fields| data_fields.split(',').map{|fields| fields.to_i} } if fields.class == String # String syntax
+			ids.each_with_index do |id, n|
+				data_file = extract_fields(id, fields[n])
+				if data.empty?
+					data.concat(data_file)
+				else
+					data.each_with_index do |row, n|
+						data[n] = row + data_file[n]
+					end
+				end
+			end
+		else
+			fields = fields.first if fields.class == Array
+			data = extract_fields(ids, options[:fields])
+		end
+		return data
+	end
+
+	def extract_fields(id, fields)
+		data = []
+		@hash_vars[id].each do |row|
+			if fields.empty?
+				data << row.dup # Dup generates a array copy that avoids to modify original objects on data manipulation creating graphs
+			else
+				data << fields.map{|field| row[field]} #Map without bang do the same than dup
+			end
+		end
+		return data
+	end
+
+	# TABLE METHODS
+	#-------------------------------------------------------------------------------------
+	def table(user_options = {}, &block)
+		options = {
+			id: nil,
+			header: false,
+			row_names: false,
+			add_header_row_names: false,
+			transpose: false,
+			fields: [],
+			border: 1,
+			cell_align: [],
+			attrib: {}
+		}
+		options.merge!(user_options)
+		table_attr = prepare_table_attribs(options[:attrib])
+		array_data = get_data(options)
+		block.call(array_data) if !block.nil?
+		rowspan, colspan = get_col_n_row_span(array_data)
 		html = "
-		<table>
-			<% @hash_vars[data_id].each do |row| %>
+		<table border=\"#{options[:border]}\" #{table_attr}>
+			<% array_data.each_with_index do |row, i| %>
 				<tr>
-					<% row.each do |cell| %>
-						<td><%= cell %></td>
+					<% row.each_with_index do |cell, j|
+						if cell != 'colspan' && cell != 'rowspan' 
+							if i == 0 && options[:header] %>
+								<th <%= get_span(colspan, rowspan, i, j) %>><%= cell %></th>
+							<% else %>
+								<td <%= get_cell_align(options[:cell_align], j) %> <%= get_span(colspan, rowspan, i, j) %>><%= cell %></td>
+							<% end 
+						end %>
 					<% end %>
-				<tr>
+				</tr>
 			<% end %>
 		</table>
 		"
 		return ERB.new(html).result(binding)
 	end
 
-	def canvasXpress_main(user_options, data_format = 'one_axis')
+	def get_span(colspan, rowspan, row, col)
+		span = []
+		colspan_value = colspan[row][col]
+		rowspan_value = rowspan[row][col]
+		if colspan_value > 1
+			span << "colspan=\"#{colspan_value}\""
+		end
+		if rowspan_value > 1
+			span << "rowspan=\"#{rowspan_value}\""
+		end
+		return span.join(' ')
+	end
+
+	def get_col_n_row_span(table)
+		colspan = []
+		rowspan = []
+		last_row = 0
+		table.each_with_index do |row, r|
+			rowspan << Array.new(row.length, 1)
+			colspan << Array.new(row.length, 1)
+			last_col = 0
+			row.each_with_index do |col, c|
+				if col == 'colspan'
+					colspan[r][last_col] += 1
+				else
+					last_col = c
+				end
+				if col == 'rowspan'
+					rowspan[last_row][c] += 1
+				else
+					last_row = r
+				end
+			end
+		end
+		return rowspan, colspan
+	end
+
+
+	def get_cell_align(align_vector, position)
+		cell_align = '' 
+		if !align_vector.empty? 
+			align = align_vector[position]
+			cell_align = "align=\"#{align}\""
+		end
+		return cell_align
+	end
+
+	def prepare_table_attribs(attribs)
+		attribs_string = ''
+		if !attribs.empty?
+			attribs.each do |attrib, value|
+				attribs_string << "#{attrib}= \"#{value}\" "
+			end
+		end
+		return attribs_string
+	end
+
+
+	# CANVASXPRESS METHODS
+	#-------------------------------------------------------------------------------------
+	def canvasXpress_main(user_options, block = nil)
 		# Handle arguments
 		#------------------------------------------
 		options = {
 			id: nil,
-			var_name: [],
-			height: 600,
-			width: 600,
+			fields: [],
+			data_format: 'one_axis',
+			responsive: true,
+			height: '600px',
+			width: '600px',
 			header: false,
+			row_names: false,
+			add_header_row_names: true,
+			transpose: true,
 			x_label: 'x_axis',
 			title: 'Title',
 			config: {}
 		}
 		options.merge!(user_options)
 		config = {
-				'toolbarPermanent' => true,
-				'xAxisTitle' => options[:x_label],
-				'title' => options[:title]
+			'toolbarPermanent' => true,
+			'xAxisTitle' => options[:x_label],
+			'title' => options[:title]
 		}
 		config.merge!(options[:config])
-
 		# Data manipulation
 		#------------------------------------------
-		data_array = @hash_vars[options[:id]]
-		samples = nil
-		values = []
-		if data_format == 'one_axis'
-			if options[:header] 
-				# We don't use shift to avoid the corruption of the table if the same table is used twice
-				header = data_array.first
-				header = header[1..header.length-1] #discards name of columns ids
-				options[:var_name] = header
-			end
-			ncols = data_array.first.length
-			nrows = data_array.length
-			ncols.times do |n|
-				if n == 0
-					samples = data_array.map{|item| item[n]}
-					samples.shift if options[:header] # Discard col header from row ids
-				else
-					vals = data_array.map{|item| item[n]}
-					vals.shift if options[:header] # Discard col header from numeric values
-					values << vals
-				end
-			end
-		elsif data_format == 'sccater2D'
-			if !options[:header]
-				samples = ['x']
-				(data_array.first.length - 1).times do |n|
-					samples << "smp#{n}"
-				end
-			else
-				samples = data_array.first
-				data_array = data_array[1..data_array.length-1]
-			end
-			values = data_array
+		data_array = get_data(options)
+		block.call(data_array) if !block.nil?
+		raise("ID #{options[:id]} has not data") if data_array.nil?
+		
+		samples = data_array.shift[1..data_array.first.length]
+		vars = []
+		data_array.each do |row|
+			vars << row.shift
 		end
+		values = data_array
 
-		options.delete(:var_name) if options[:var_name].empty? || !options[:header]
-		yield(options, config, samples, values)
+		yield(options, config, samples, vars, values)
 
 		# Build JSON objects and Javascript code
 		#-----------------------------------------------
+		object_id = "obj_#{@count_objects}_#{config['graphType']}"
+		@count_objects += 1
 		data_structure = {
 			'y' => {
-				'vars' => options[:var_name],
+				'vars' => vars,
 				'smps' => samples,
 				'data' => values
 			}
 		}
-		object_id = options[:id].to_s + '_' + config['graphType']
+		events = false
+		info = false
+		afterRender = {}
+		extracode = nil
+		if options[:mod_data_structure] == 'boxplot'
+			data_structure['y']['smps'] = nil
+			data_structure.merge!({ 'x' => {'Factor' => samples}})
+			extracode = "C#{object_id}.groupSamples([\"Factor\"]);"
+		elsif options[:mod_data_structure] == 'circular'
+			data_structure.merge!({ 'z' => {'Ring' => options[:ring_assignation]}})
+			data_structure.merge!({ 'c' => options[:links]}) if !options[:links].nil?
+		end
 		plot_data = "
 		var data = #{data_structure.to_json};
-        var conf = #{config.to_json};                 
-        var C#{object_id} = new CanvasXpress(\"#{object_id}\", data, conf);\n"
+        var conf = #{config.to_json}; 
+        var events = #{events.to_json};
+        var info = #{info.to_json};
+        var afterRender = #{afterRender.to_json};                
+        var C#{object_id} = new CanvasXpress(\"#{object_id}\", data, conf, events, info, afterRender);\n#{extracode}\n"
         @plots_data << plot_data
         
-		html = "<canvas  id=\"#{object_id}\" width=\"#{options[:width]}\" height=\"#{options[:height]}\" aspectRatio='1:1' responsive='true'></canvas>"
+        responsive = ''
+        responsive = "responsive='true'" if options[:responsive]
+		html = "<canvas  id=\"#{object_id}\" width=\"#{options[:width]}\" height=\"#{options[:height]}\" aspectRatio='1:1' #{responsive}></canvas>"
 		return ERB.new(html).result(binding)
 	end
 
-	def line(user_options = {})
-		html_string = canvasXpress_main(user_options) do |options, config, samples, values|
+	def line(user_options = {}, &block)
+		default_options = {
+			row_names: true			
+		}.merge!(user_options)
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
 			config['graphType'] = 'Line'	
 		end
 		return html_string
 	end
 
-	def stacked(user_options = {})
-		html_string = canvasXpress_main(user_options) do |options, config, samples, values|
+	def stacked(user_options = {}, &block)
+		default_options = {
+			row_names: true,
+		}.merge!(user_options)
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
 			config['graphType'] = 'Stacked'	
 		end
 		return html_string
 	end
 	
-	def barplot(user_options = {})
-		html_string = canvasXpress_main(user_options) do |options, config, samples, values|
+	def barplot(user_options = {}, &block)
+		default_options = {
+			row_names: true
+		}.merge!(user_options)
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
 			config['graphType'] = 'Bar'	
 		end
 		return html_string
 	end
 
-	def pie(user_options = {})
-		html_string = canvasXpress_main(user_options) do |options, config, samples, values|
-			config['graphType'] = 'Pie'	
+	def boxplot(user_options = {}, &block)
+		default_options = {
+			row_names: true,
+			header: true
+		}.merge!(user_options)
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+			config['graphType'] = 'Boxplot'
+			options[:mod_data_structure] = 'boxplot'	
+		end
+		return html_string
+	end
+
+	def pie(user_options = {}, &block) 
+		default_options = {
+			transpose: false
+		}.merge!(user_options)
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+			config['graphType'] = 'Pie'
 			if samples.length > 1
 				config['showPieGrid'] = true
 				config['xAxis'] = samples 
@@ -188,18 +371,77 @@ class Report_html
 		return html_string
 	end
 
-	def sccater2D(user_options = {})
-		html_string = canvasXpress_main(user_options, 'sccater2D') do |options, config, samples, values|
+	def sccater2D(user_options = {}, &block)
+		default_options = {
+			row_names: false,
+			transpose: false
+		}.merge!(user_options)
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
 			config['graphType'] = 'Scatter2D'
 			config['xAxis'] = [samples.first]	
 			config['yAxis']	= samples[1..samples.length-1]
-			if user_options[:y_label].nil?
+			if default_options[:y_label].nil?
 				config['yAxisTitle'] = 'y_axis'
 			else
-				config['yAxisTitle'] = user_options[:y_label]
+				config['yAxisTitle'] = default_options[:y_label]
 			end
 		end
 		return html_string
 	end
 
+	def circular(user_options = {}, &block)
+		default_options = {
+			ring_assignation: [],
+			ringsType: [],
+			ringsWeight: []
+		}.merge!(user_options)
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+			options[:mod_data_structure] = 'circular'
+			config['graphType'] = 'Circular'
+			config['segregateVariablesBy'] = ['Ring']
+			if default_options[:ringsType].empty?
+				config['ringsType'] = Array.new(vars.length, 'heatmap')
+			else
+				config['ringsType'] = default_options[:ringsType]
+			end
+			if default_options[:ringsWeight].empty?
+				size = 100/vars.length
+				config['ringsWeight'] = Array.new(vars.length, size)
+			else
+				config['ringsWeight'] = default_options[:ringsWeight]
+			end
+			if default_options[:ring_assignation].empty?
+				options[:ring_assignation] = Array.new(vars.length) {|index| (index + 1).to_s}
+			else
+				options[:ring_assignation] = default_options[:ring_assignation].map{|item| item.to_s}
+			end
+			if !default_options[:links].nil?
+				link_data = get_data({id: default_options[:links], fields: [], add_header_row_names: false, text: true, transpose: false})
+				options[:links] = assign_rgb(link_data)
+			end
+		end
+		return html_string
+	end
+
+	def assign_rgb(link_data)
+		colors = {
+			'red' => [255, 0, 0],
+			'green' => [0, 255, 0],
+			'black'	=> [0, 0, 0],
+			'yellow' => [255, 255, 0],
+			'blue' => [0, 0, 255],
+			'gray' => [128, 128, 128],
+			'orange' => [255, 165, 0],
+			'cyan' => [0, 255, 255],
+			'magenta' => [255, 0, 255]
+		}
+		link_data.each do |link|
+			code = colors[link[0]]
+			if !code.nil?
+				link[0] = "rgb(#{code.join(',')})"
+			else
+				raise "Color link #{link} is not allowed. The allowed color names are: #{colors.keys.join(' ')}"
+			end
+		end
+	end
 end
