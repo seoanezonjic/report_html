@@ -1,6 +1,7 @@
 require 'erb'
 require 'fileutils'
 require 'json'
+require 'base64'
 
 JS_FOLDER = File.expand_path(File.join(__FILE__, '..', '..', '..', 'js'))
 
@@ -343,6 +344,16 @@ class Report_html
 		return html_string
 	end
 
+	def heatmap(user_options = {}, &block)
+		default_options = {
+			row_names: true
+		}.merge!(user_options)
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+			config['graphType'] = 'Heatmap'	
+		end
+		return html_string
+	end
+
 	def boxplot(user_options = {}, &block)
 		default_options = {
 			row_names: true,
@@ -444,4 +455,16 @@ class Report_html
 			end
 		end
 	end
+
+	# EMBED FILES
+	###################################################################################
+
+	def embed_img(img_file, img_attribs = nil)
+		img_content = File.open(img_file).read
+		img_base64 = Base64.encode64(img_content)
+		format = File.basename(img_file).split('.').last
+		img_string = "<img #{img_attribs} src=\"data:image/#{format};base64,#{img_base64}\">"
+		return img_string
+	end
+
 end

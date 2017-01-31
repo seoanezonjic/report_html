@@ -1,0 +1,84 @@
+#! /usr/bin/env ruby
+
+ROOT_PATH = File.dirname(__FILE__)
+
+$: << File.expand_path(File.join(ROOT_PATH, "..", "lib"))
+$: << File.expand_path(File.join(ROOT_PATH, "..", "lib", "report_html"))
+
+require 'optparse'
+require 'report_html'
+
+def load_files(options)
+	container = {}
+	options[:data_files].each do |file_path|
+		raise("File path #{file_path} not exists") if !File.exists?(file_path)
+		data_id = File.basename(file_path)
+		data = parse_tabular_file(file_path)
+		container[data_id] = data
+	end
+	return container
+end
+
+def parse_tabular_file(file_path)
+	data = []
+	File.open(file_path).each do |line|
+		data << line.chomp.split("\t")
+	end
+	return data
+end
+
+#################################################################################################
+## INPUT PARSING
+#################################################################################################
+options = {}
+
+optparse = OptionParser.new do |opts|
+        options[:template] = nil
+        opts.on( '-t', '--template PATH', 'Input template file' ) do |template|
+            options[:template] = template
+        end
+
+        options[:output] = 'Report'
+        opts.on( '-o', '--report PATH', 'Path to generated html file (without extension)' ) do |output|
+            options[:output] = output
+        end
+
+        options[:data_files] = []
+        opts.on( '-d', '--data_files STRING', 'Text files with data to use on graphs or tables within report' ) do |files|
+            options[:data_files] = files.gsub(/\s+/,'').split(",")
+        end
+
+
+        # Set a banner, displayed at the top of the help screen.
+        opts.banner = "Usage: #{File.basename(__FILE__)} [options] \n\n"
+
+        # This displays the help screen
+        opts.on( '-h', '--help', 'Display this screen' ) do
+                puts opts
+                exit
+        end
+
+end # End opts
+
+# parse options and remove from ARGV
+optparse.parse!
+
+####################################################################################################
+## MAIN
+######################################################################################################
+if !File.exists?(options[:template])
+	puts 'Template file not exists'
+	Process.exit
+end
+
+if options[:data_files].empty?
+	puts 'Data files has not been specified'
+	Process.exit
+end
+
+container = load_files(options)
+template = File.open(options[:template]).read
+
+report = Report_html.new(container, File.basename(options[:output]), true)
+report.build(template)
+report.write(options[:output] + '.html')
