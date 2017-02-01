@@ -275,7 +275,6 @@ class Report_html
 		values = data_array
 
 		yield(options, config, samples, vars, values)
-
 		# Build JSON objects and Javascript code
 		#-----------------------------------------------
 		object_id = "obj_#{@count_objects}_#{config['graphType']}"
@@ -395,6 +394,47 @@ class Report_html
 				config['yAxisTitle'] = 'y_axis'
 			else
 				config['yAxisTitle'] = default_options[:y_label]
+			end
+		end
+		return html_string
+	end
+
+	def scatterbubble2D(user_options = {}, &block)
+		default_options = {
+			row_names: true,
+			transpose: false
+		}.merge!(user_options)
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+			config['graphType'] = 'ScatterBubble2D'
+			if options[:xAxis].nil?	
+				config['xAxis'] = [samples[0]]
+			else
+				config['xAxis'] = options[:xAxis]
+			end
+			if options[:yAxis].nil?	
+				config['yAxis'] = [samples[1]]
+			else
+				config['yAxis'] = options[:yAxis]
+			end
+			if options[:zAxis].nil?	
+				config['zAxis'] = [samples[2]]
+			else
+				config['zAxis'] = options[:zAxis]
+			end
+			if default_options[:y_label].nil?
+				config['yAxisTitle'] = 'y_axis'
+			else
+				config['yAxisTitle'] = default_options[:y_label]
+			end
+			if default_options[:z_label].nil?
+				config['zAxisTitle'] = 'z_axis'
+			else
+				config['zAxisTitle'] = default_options[:z_label]
+			end
+			if !options[:upper_limit].nil? && !options[:lower_limit].nil? && !options[:ranges].nil?
+				diff = (options[:upper_limit] - options[:lower_limit]).to_f/options[:ranges]
+				sizes = Array.new(options[:ranges]) {|index| options[:lower_limit] + index * diff}
+				config['sizes'] = sizes
 			end
 		end
 		return html_string
