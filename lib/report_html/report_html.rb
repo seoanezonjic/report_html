@@ -236,6 +236,16 @@ class Report_html
 
 	# CANVASXPRESS METHODS
 	#-------------------------------------------------------------------------------------
+	def add_sample_attributes(data_structure, options)
+		parsed_sample_attributes = {}
+		options[:sample_attributes].each do |key, col|
+			data = get_data({id: options[:id], fields: [col], text: true})
+			data.shift if options[:header]
+			parsed_sample_attributes[key] = data.flatten 
+		end
+		data_structure['x'] = parsed_sample_attributes
+	end
+
 	def canvasXpress_main(user_options, block = nil)
 		# Handle arguments
 		#------------------------------------------
@@ -252,7 +262,9 @@ class Report_html
 			transpose: true,
 			x_label: 'x_axis',
 			title: 'Title',
-			config: {}
+			sample_attributes: {},
+			config: {},
+			after_render: []
 		}
 		options.merge!(user_options)
 		config = {
@@ -266,7 +278,6 @@ class Report_html
 		data_array = get_data(options)
 		block.call(data_array) if !block.nil?
 		raise("ID #{options[:id]} has not data") if data_array.nil?
-		
 		samples = data_array.shift[1..data_array.first.length]
 		vars = []
 		data_array.each do |row|
@@ -274,10 +285,10 @@ class Report_html
 		end
 		values = data_array
 
-		yield(options, config, samples, vars, values)
+		object_id = "obj_#{@count_objects}_#{config['graphType']}"
+		yield(options, config, samples, vars, values, object_id)
 		# Build JSON objects and Javascript code
 		#-----------------------------------------------
-		object_id = "obj_#{@count_objects}_#{config['graphType']}"
 		@count_objects += 1
 		data_structure = {
 			'y' => {
@@ -288,23 +299,24 @@ class Report_html
 		}
 		events = false
 		info = false
-		afterRender = {}
-		extracode = nil
+		afterRender = options[:after_render]
 		if options[:mod_data_structure] == 'boxplot'
 			data_structure['y']['smps'] = nil
 			data_structure.merge!({ 'x' => {'Factor' => samples}})
-			extracode = "C#{object_id}.groupSamples([\"Factor\"]);"
 		elsif options[:mod_data_structure] == 'circular'
 			data_structure.merge!({ 'z' => {'Ring' => options[:ring_assignation]}})
 			data_structure.merge!({ 'c' => options[:links]}) if !options[:links].nil?
 		end
+		add_sample_attributes(data_structure, options) if !options[:sample_attributes].empty?
+		extracode = "#{options[:extracode]}\n"
+		extracode << "C#{object_id}.groupSamples(#{options[:group_samples]})\n" if !options[:group_samples].nil?
 		plot_data = "
 		var data = #{data_structure.to_json};
         var conf = #{config.to_json}; 
         var events = #{events.to_json};
         var info = #{info.to_json};
         var afterRender = #{afterRender.to_json};                
-        var C#{object_id} = new CanvasXpress(\"#{object_id}\", data, conf, events, info, afterRender);\n#{extracode}\n"
+        var C#{object_id} = new CanvasXpress(\"#{object_id}\", data, conf, events, info, afterRender);\n#{extracode}"
         @plots_data << plot_data
         
         responsive = ''
@@ -317,7 +329,7 @@ class Report_html
 		default_options = {
 			row_names: true			
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
 			config['graphType'] = 'Line'	
 		end
 		return html_string
@@ -327,7 +339,7 @@ class Report_html
 		default_options = {
 			row_names: true,
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
 			config['graphType'] = 'Stacked'	
 		end
 		return html_string
@@ -337,8 +349,8 @@ class Report_html
 		default_options = {
 			row_names: true
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
-			config['graphType'] = 'Bar'	
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+			config['graphType'] = 'Bar'
 		end
 		return html_string
 	end
@@ -347,7 +359,7 @@ class Report_html
 		default_options = {
 			row_names: true
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
 			config['graphType'] = 'Heatmap'	
 		end
 		return html_string
@@ -358,9 +370,12 @@ class Report_html
 			row_names: true,
 			header: true
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
 			config['graphType'] = 'Boxplot'
-			options[:mod_data_structure] = 'boxplot'	
+			options[:mod_data_structure] = 'boxplot'
+			if options[:extracode].nil?
+				options[:extracode] = "C#{object_id}.groupSamples([\"Factor\"]);"
+			end
 		end
 		return html_string
 	end
@@ -369,7 +384,7 @@ class Report_html
 		default_options = {
 			transpose: false
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
 			config['graphType'] = 'Pie'
 			if samples.length > 1
 				config['showPieGrid'] = true
@@ -386,14 +401,17 @@ class Report_html
 			row_names: false,
 			transpose: false
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
 			config['graphType'] = 'Scatter2D'
-			config['xAxis'] = [samples.first]	
-			config['yAxis']	= samples[1..samples.length-1]
+			config['xAxis'] = [samples.first] if config['xAxis'].nil?	
+			config['yAxis']	= samples[1..samples.length-1] if config['yAxis'].nil?
 			if default_options[:y_label].nil?
 				config['yAxisTitle'] = 'y_axis'
 			else
 				config['yAxisTitle'] = default_options[:y_label]
+			end
+			if options[:regressionLine]
+				options[:extracode] = "C#{object_id}.addRegressionLine();"
 			end
 		end
 		return html_string
@@ -404,7 +422,7 @@ class Report_html
 			row_names: true,
 			transpose: false
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
 			config['graphType'] = 'ScatterBubble2D'
 			if options[:xAxis].nil?	
 				config['xAxis'] = [samples[0]]
@@ -446,7 +464,7 @@ class Report_html
 			ringsType: [],
 			ringsWeight: []
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
 			options[:mod_data_structure] = 'circular'
 			config['graphType'] = 'Circular'
 			config['segregateVariablesBy'] = ['Ring']
@@ -507,4 +525,10 @@ class Report_html
 		return img_string
 	end
 
+	def embed_pdf(pdf_file, pdf_attribs = nil)
+		pdf_content = File.open(pdf_file).read
+		pdf_base64 = Base64.encode64(pdf_content)
+		pdf_string = "<embed #{pdf_attribs} src=\"data:application/pdf;base64,#{pdf_base64}\" type=\"application/pdf\"></embed>"
+		return pdf_string
+	end
 end
