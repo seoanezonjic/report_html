@@ -21,7 +21,7 @@ def index_data(table, selected_data, col_index, range, null_string)
             if row[0] == sel_data[col_index]
                 data = selected_data.delete_at(sel_index)
                 data.delete_at(col_index)
-                temp_range = [range, data] if range > 0
+                temp_range = [range, data] if !range.nil? && range > 0
                 row.concat(data)
                 match = true
                 break
