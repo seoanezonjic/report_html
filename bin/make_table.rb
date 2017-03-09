@@ -14,7 +14,6 @@ end
 def index_data(table, selected_data, col_index, range, null_string)
     efective_data_length = selected_data.first.length - 1
     null_data = Array.new(efective_data_length, null_string)
-    
     temp_range = []    
     table.each_with_index do |row, index|
         match = false
@@ -109,6 +108,8 @@ options[:files].each_with_index do |file, n|
         end
         if table.empty?
             table = selected_data
+        elsif selected_data.empty?
+            concat_data(table, Array.new(table.length, [options[:null]]))
         else
             if col_index == -1
                 concat_data(table, selected_data)

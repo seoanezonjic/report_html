@@ -277,15 +277,17 @@ class Report_html
 		#------------------------------------------
 		data_array = get_data(options)
 		block.call(data_array) if !block.nil?
+		object_id = "obj_#{@count_objects}_"
 		raise("ID #{options[:id]} has not data") if data_array.nil?
-		samples = data_array.shift[1..data_array.first.length]
+		row_length = data_array.first.length
+		samples = data_array.shift[1..row_length]
+		return ERB.new("<div width=\"#{options[:width]}\" height=\"#{options[:height]}\" > <p>NO DATA<p></div>").result(binding) if data_array.empty?
 		vars = []
 		data_array.each do |row|
 			vars << row.shift
 		end
 		values = data_array
 
-		object_id = "obj_#{@count_objects}_#{config['graphType']}"
 		yield(options, config, samples, vars, values, object_id)
 		# Build JSON objects and Javascript code
 		#-----------------------------------------------
@@ -312,15 +314,15 @@ class Report_html
 		extracode << "C#{object_id}.groupSamples(#{options[:group_samples]})\n" if !options[:group_samples].nil?
 		plot_data = "
 		var data = #{data_structure.to_json};
-        var conf = #{config.to_json}; 
-        var events = #{events.to_json};
-        var info = #{info.to_json};
-        var afterRender = #{afterRender.to_json};                
-        var C#{object_id} = new CanvasXpress(\"#{object_id}\", data, conf, events, info, afterRender);\n#{extracode}"
-        @plots_data << plot_data
+	        var conf = #{config.to_json}; 
+        	var events = #{events.to_json};
+	        var info = #{info.to_json};
+	        var afterRender = #{afterRender.to_json};                
+	        var C#{object_id} = new CanvasXpress(\"#{object_id}\", data, conf, events, info, afterRender);\n#{extracode}"
+	        @plots_data << plot_data
         
-        responsive = ''
-        responsive = "responsive='true'" if options[:responsive]
+	        responsive = ''
+	        responsive = "responsive='true'" if options[:responsive]
 		html = "<canvas  id=\"#{object_id}\" width=\"#{options[:width]}\" height=\"#{options[:height]}\" aspectRatio='1:1' #{responsive}></canvas>"
 		return ERB.new(html).result(binding)
 	end
@@ -485,8 +487,10 @@ class Report_html
 				options[:ring_assignation] = default_options[:ring_assignation].map{|item| item.to_s}
 			end
 			if !default_options[:links].nil?
-				link_data = get_data({id: default_options[:links], fields: [], add_header_row_names: false, text: true, transpose: false})
-				options[:links] = assign_rgb(link_data)
+				if !@hash_vars[default_options[:links]].nil? && !@hash_vars[default_options[:links]].empty?
+					link_data = get_data({id: default_options[:links], fields: [], add_header_row_names: false, text: true, transpose: false}) 
+					options[:links] = assign_rgb(link_data)
+				end
 			end
 		end
 		return html_string
