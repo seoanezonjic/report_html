@@ -68,22 +68,24 @@ class Report_html
 	def get_data(options)
 		data = []
 		data = extract_data(options)
-		if @data_from_files # If data on container is loaded using html_report as lib, we don't care about data format
-							# if data comes from files and is loaded as strings. We need to format correctly the data.
-			rows = data.length
-			cols = data.first.length
-			if !options[:text]
-				rows.times do |r|
-					cols.times do |c|
-						next if r == 0 && options[:header]
-						next if c == 0 && options[:row_names]
-						data[r][c] = data[r][c].to_f
+		if !data.empty?
+			if @data_from_files # If data on container is loaded using html_report as lib, we don't care about data format
+								# if data comes from files and is loaded as strings. We need to format correctly the data.
+				rows = data.length
+				cols = data.first.length
+				if !options[:text]
+					rows.times do |r|
+						cols.times do |c|
+							next if r == 0 && options[:header]
+							next if c == 0 && options[:row_names]
+							data[r][c] = data[r][c].to_f
+						end
 					end
 				end
 			end
+			add_header_row_names(data, options)
+			data = data.transpose if options[:transpose]
 		end
-		add_header_row_names(data, options)
-		data = data.transpose if options[:transpose]
 		return data
 	end
 
@@ -275,13 +277,15 @@ class Report_html
 		config.merge!(options[:config])
 		# Data manipulation
 		#------------------------------------------
+		no_data_string = ERB.new("<div width=\"#{options[:width]}\" height=\"#{options[:height]}\" > <p>NO DATA<p></div>").result(binding)
 		data_array = get_data(options)
+		return no_data_string if data_array.empty?
 		block.call(data_array) if !block.nil?
 		object_id = "obj_#{@count_objects}_"
 		raise("ID #{options[:id]} has not data") if data_array.nil?
 		row_length = data_array.first.length
 		samples = data_array.shift[1..row_length]
-		return ERB.new("<div width=\"#{options[:width]}\" height=\"#{options[:height]}\" > <p>NO DATA<p></div>").result(binding) if data_array.empty?
+		return no_data_string if data_array.empty?
 		vars = []
 		data_array.each do |row|
 			vars << row.shift
