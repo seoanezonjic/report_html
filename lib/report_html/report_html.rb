@@ -255,10 +255,10 @@ class Report_html
 
 	def set_tree(options, config)
 		tree = tree_from_file(options[:tree])
-		if options[:treeBy] = 's'
+		if options[:treeBy] == 's'
 			config['smpDendrogramNewick'] = tree
 			config['samplesClustered'] = true
-		else options[:treeBy] = 'v'
+		elsif options[:treeBy] == 'v'
 			config['varDendrogramNewick'] = tree
 			config['variablesClustered'] = true
 		end
