@@ -248,6 +248,22 @@ class Report_html
 		data_structure['x'] = parsed_sample_attributes
 	end
 
+	def tree_from_file(file)
+	        string_tree = File.open(file).read.gsub("\n", '')
+	        return string_tree
+	end
+
+	def set_tree(options, config)
+		tree = tree_from_file(options[:tree])
+		if options[:treeBy] = 's'
+			config['smpDendrogramNewick'] = tree
+			config['samplesClustered'] = true
+		else options[:treeBy] = 'v'
+			config['varDendrogramNewick'] = tree
+			config['variablesClustered'] = true
+		end
+	end
+
 	def canvasXpress_main(user_options, block = nil)
 		# Handle arguments
 		#------------------------------------------
@@ -266,7 +282,8 @@ class Report_html
 			title: 'Title',
 			sample_attributes: {},
 			config: {},
-			after_render: []
+			after_render: [],
+			treeBy: 's'
 		}
 		options.merge!(user_options)
 		config = {
@@ -274,6 +291,9 @@ class Report_html
 			'xAxisTitle' => options[:x_label],
 			'title' => options[:title]
 		}
+		if  !options[:tree].nil?
+			set_tree(options, config)
+		end
 		config.merge!(options[:config])
 		# Data manipulation
 		#------------------------------------------
