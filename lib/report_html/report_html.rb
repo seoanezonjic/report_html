@@ -331,7 +331,6 @@ class Report_html
 			data_structure.merge!({ 'x' => {'Factor' => samples}})
 		elsif options[:mod_data_structure] == 'circular'
 			data_structure.merge!({ 'z' => {'Ring' => options[:ring_assignation]}})
-			data_structure.merge!({ 'c' => options[:links]}) if !options[:links].nil?
 		end
 		add_sample_attributes(data_structure, options) if !options[:sample_attributes].empty?
 		extracode = "#{options[:extracode]}\n"
@@ -513,7 +512,7 @@ class Report_html
 			if !default_options[:links].nil?
 				if !@hash_vars[default_options[:links]].nil? && !@hash_vars[default_options[:links]].empty?
 					link_data = get_data({id: default_options[:links], fields: [], add_header_row_names: false, text: true, transpose: false}) 
-					options[:links] = assign_rgb(link_data)
+					config['connections'] = assign_rgb(link_data)
 				end
 			end
 		end
