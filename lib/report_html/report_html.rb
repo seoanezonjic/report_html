@@ -494,15 +494,15 @@ class Report_html
 			config['graphType'] = 'Circular'
 			config['segregateVariablesBy'] = ['Ring']
 			if default_options[:ringsType].empty?
-				config['ringsType'] = Array.new(vars.length, 'heatmap')
+				config['ringGraphType'] = Array.new(vars.length, 'heatmap')
 			else
-				config['ringsType'] = default_options[:ringsType]
+				config['ringGraphType'] = default_options[:ringsType]
 			end
 			if default_options[:ringsWeight].empty?
 				size = 100/vars.length
-				config['ringsWeight'] = Array.new(vars.length, size)
+				config['ringGraphWeight'] = Array.new(vars.length, size)
 			else
-				config['ringsWeight'] = default_options[:ringsWeight]
+				config['ringGraphWeight'] = default_options[:ringsWeight]
 			end
 			if default_options[:ring_assignation].empty?
 				options[:ring_assignation] = Array.new(vars.length) {|index| (index + 1).to_s}
