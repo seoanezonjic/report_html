@@ -30,14 +30,20 @@ class Report_html
 	end
 
 	def make_head
+		js_file = File.open(File.join(JS_FOLDER, 'canvasXpress.min.js')).read
+		js_base64 = Base64.encode64(js_file)
+		css_file = File.open(File.join(JS_FOLDER, 'canvasXpress.css')).read
+
 		@all_report << "\t<title>#{@title}</title>
 			<head>
+				<meta charset=\"utf-8\">
 			    <meta http-equiv=\"CACHE-CONTROL\" CONTENT=\"NO-CACHE\">
     			<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />
     			<meta http-equiv=\"Content-Language\" content=\"en-us\" />
-
-    			<link rel=\"stylesheet\" href=\"js/canvasXpress.css\" type=\"text/css\"/>
-    			<script type=\"text/javascript\" src=\"js/canvasXpress.min.js\"></script>
+				<style type=\"text/css\"/>
+					#{css_file}
+				</style>
+				<script src=\"data:application/javascript;base64,#{js_base64}\" type=\"application/javascript\"></script>
     			<script>
 					var initPage = function () {        
 						<% @plots_data.each do |plot_data| %>
@@ -54,9 +60,9 @@ class Report_html
 	end
 
 	def write(file)
-		dir = File.dirname(file)
+		#dir = File.dirname(file)
 		string_report = get_report
-		FileUtils.cp_r(JS_FOLDER, dir) 
+		#FileUtils.cp_r(JS_FOLDER, dir) 
 		File.open(file, 'w'){|f| f.puts string_report}
 	end
 
