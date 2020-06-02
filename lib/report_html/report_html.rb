@@ -13,6 +13,7 @@ class Report_html
 		@data_from_files = data_from_files
 		@plots_data = []
 		@count_objects = 0
+		@dt_tables = [] #Tables to be styled with the DataTables js lib"
 	end
 
 	def build(template)
@@ -26,32 +27,86 @@ class Report_html
 	end
 
 	def build_body
-		@all_report << "<body onload=\"initPage();\">\n#{yield}\n</body>\n"
+		if !@plots_data.empty?
+			@all_report << "<body onload=\"initPage();\">\n#{yield}\n</body>\n"
+		else
+			@all_report << "<body>\n#{yield}\n</body>\n"
+		end
+	end
+
+	def load_js_libraries(js_libraries)
+		loaded_libraries = []
+		js_libraries.each do |js_lib|
+			js_file = File.open(File.join(JS_FOLDER, js_lib)).read
+			loaded_libraries << Base64.encode64(js_file)
+		end
+		return loaded_libraries
+	end
+
+	def load_css(css_files)
+		loaded_css = []
+		css_files.each do |css_lib|
+			loaded_css << File.open(File.join(JS_FOLDER, css_lib)).read
+		end
+		return loaded_css
 	end
 
 	def make_head
-		js_file = File.open(File.join(JS_FOLDER, 'canvasXpress.min.js')).read
-		js_base64 = Base64.encode64(js_file)
-		css_file = File.open(File.join(JS_FOLDER, 'canvasXpress.css')).read
-
 		@all_report << "\t<title>#{@title}</title>
 			<head>
 				<meta charset=\"utf-8\">
 			    <meta http-equiv=\"CACHE-CONTROL\" CONTENT=\"NO-CACHE\">
     			<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />
-    			<meta http-equiv=\"Content-Language\" content=\"en-us\" />
-				<style type=\"text/css\"/>
-					#{css_file}
-				</style>
-				<script src=\"data:application/javascript;base64,#{js_base64}\" type=\"application/javascript\"></script>
-    			<script>
-					var initPage = function () {        
-						<% @plots_data.each do |plot_data| %>
-							<%= plot_data %>
-						<% end %>
-					}
-				</script>
-			</head>\n"
+    			<meta http-equiv=\"Content-Language\" content=\"en-us\" />\n"
+
+    	# ADD JS LIBRARIES AND CSS
+		js_libraries = []
+		css_files = []
+		if !@plots_data.empty?
+			js_libraries << 'canvasXpress.min.js'
+			css_files << 'canvasXpress.css'
+		end
+		if !@dt_tables.empty? # CDN load, this library is difficult to embed in html file
+			@all_report << '<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.10.21/datatables.min.css"/>'+"\n"
+	 		@all_report << '<script type="text/javascript" src="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.10.21/datatables.min.js"></script>'+"\n"
+	 	end
+		loaded_js_libraries = load_js_libraries(js_libraries)
+		loaded_css = load_css(css_files)
+    	loaded_css.each do |css|
+			@all_report << "<style type=\"text/css\"/>
+					#{css}
+				</style>\n"
+		end
+    	loaded_js_libraries.each do |lib|
+			@all_report << "<script src=\"data:application/javascript;base64,#{lib}\" type=\"application/javascript\"></script>\n"
+		end
+    	
+    	# ADD CUSTOM FUNCTIONS TO USE LOADED JS LIBRARIES
+    	#canvasXpress objects
+    	if !@plots_data.empty?
+	    	@all_report << "<script>
+						var initPage = function () {        
+							<% @plots_data.each do |plot_data| %>
+								<%= plot_data %>
+							<% end %>
+						}
+					</script>"
+		end
+
+    	#DT tables
+    	if !@dt_tables.empty?
+	    	@all_report << "<script>
+							<% @dt_tables.each do |dt_table| %>
+								$(document).ready(function () {
+									$('#<%= dt_table %>').DataTable();
+								});
+								
+							<% end %>
+						</script>\n"
+		end
+
+
+		@all_report <<	"</head>\n"
 	end
 
 	def get_report #return all html string
@@ -164,9 +219,18 @@ class Report_html
 		array_data = get_data(options)
 		block.call(array_data) if !block.nil?
 		rowspan, colspan = get_col_n_row_span(array_data)
+		table_id = 'table_' + @count_objects.to_s
+		@dt_tables << table_id if options[:styled] == 'dt'
+		tbody_tag = false
 		html = "
-		<table border=\"#{options[:border]}\" #{table_attr}>
+		<table id=\"#{table_id}\" border=\"#{options[:border]}\" #{table_attr}>
+			<% if options[:header] %>
+				<thead>
+			<% end %>
 			<% array_data.each_with_index do |row, i| %>
+				<% if options[:header] && i == 1 %>
+					<tbody>
+				<% end %>
 				<tr>
 					<% row.each_with_index do |cell, j|
 						if cell != 'colspan' && cell != 'rowspan' 
@@ -178,9 +242,16 @@ class Report_html
 						end %>
 					<% end %>
 				</tr>
+				<% if i == 0 && options[:header] %>
+					</thead>
+				<% end %>
+			<% end %>
+			<% if options[:header] %>
+				</tbody>
 			<% end %>
 		</table>
 		"
+		@count_objects += 1  
 		return ERB.new(html).result(binding)
 	end
 
