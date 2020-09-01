@@ -14,6 +14,7 @@ class Report_html
 		@plots_data = []
 		@count_objects = 0
 		@dt_tables = [] #Tables to be styled with the DataTables js lib"
+		@bs_tables = [] #Tables to be styled with the bootstrap js lib"
 	end
 
 	def build(template)
@@ -57,7 +58,8 @@ class Report_html
 				<meta charset=\"utf-8\">
 			    <meta http-equiv=\"CACHE-CONTROL\" CONTENT=\"NO-CACHE\">
     			<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />
-    			<meta http-equiv=\"Content-Language\" content=\"en-us\" />\n"
+    			<meta http-equiv=\"Content-Language\" content=\"en-us\" />
+    			<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, shrink-to-fit=no\">\n"
 
     	# ADD JS LIBRARIES AND CSS
 		js_libraries = []
@@ -66,10 +68,18 @@ class Report_html
 			js_libraries << 'canvasXpress.min.js'
 			css_files << 'canvasXpress.css'
 		end
+
+	 	if !@dt_tables.empty? || !@bs_tables.empty? #Bootstrap for datatables or only for static tables. Use bootstrap version needed by datatables to avoid incompatibility issues
+		 	@all_report << '<link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"/>'+"\n"
+		end
+
 		if !@dt_tables.empty? # CDN load, this library is difficult to embed in html file
-			@all_report << '<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.10.21/datatables.min.css"/>'+"\n"
-	 		@all_report << '<script type="text/javascript" src="https://cdn.datatables.net/v/dt/jq-3.3.1/dt-1.10.21/datatables.min.js"></script>'+"\n"
-	 	end
+		 	@all_report << '<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap.min.css"/>'+"\n"
+			@all_report << '<script type="text/javascript" src="https://code.jquery.com/jquery-3.5.1.js"></script>' + "\n"
+			@all_report << '<script type="text/javascript" src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>' + "\n"
+			@all_report << '<script type="text/javascript" src="https://cdn.datatables.net/1.10.21/js/dataTables.bootstrap.min.js"></script>' + "\n"
+	 	end	 	
+
 		loaded_js_libraries = load_js_libraries(js_libraries)
 		loaded_css = load_css(css_files)
     	loaded_css.each do |css|
@@ -221,6 +231,7 @@ class Report_html
 		rowspan, colspan = get_col_n_row_span(array_data)
 		table_id = 'table_' + @count_objects.to_s
 		@dt_tables << table_id if options[:styled] == 'dt'
+		@bs_tables << table_id if options[:styled] == 'bs'
 		tbody_tag = false
 		html = "
 		<table id=\"#{table_id}\" border=\"#{options[:border]}\" #{table_attr}>
