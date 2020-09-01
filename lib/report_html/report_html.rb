@@ -364,7 +364,7 @@ class Report_html
 		}
 		options.merge!(user_options)
 		config = {
-			'toolbarPermanent' => true,
+			'toolbarType' => 'under',
 			'xAxisTitle' => options[:x_label],
 			'title' => options[:title]
 		}
@@ -518,6 +518,8 @@ class Report_html
 		end
 		return html_string
 	end
+
+	alias scatter2D sccater2D # Fix for wrong name method 
 
 	def scatterbubble2D(user_options = {}, &block)
 		default_options = {
