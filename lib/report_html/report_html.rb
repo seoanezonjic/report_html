@@ -509,6 +509,20 @@ class Report_html
 		return html_string
 	end
 
+	def corplot(user_options = {}, &block) 
+		default_options = {
+			transpose: false,
+			correlationAxis: 'samples'
+		}.merge!(user_options)
+		STDERR.puts default_options.inspect
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+			config['graphType'] = 'Correlation'
+			config['correlationAxis'] = default_options[:correlationAxis]
+			STDERR.puts config.inspect
+		end
+		return html_string
+	end
+
 	def sccater2D(user_options = {}, &block)
 		default_options = {
 			row_names: false,
