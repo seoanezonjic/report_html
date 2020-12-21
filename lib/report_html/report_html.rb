@@ -400,7 +400,9 @@ class Report_html
 		end
 		values = data_array
 
-		yield(options, config, samples, vars, values, object_id)
+		x = {}
+		z = {}
+		yield(options, config, samples, vars, values, object_id, x, z)
 		# Build JSON objects and Javascript code
 		#-----------------------------------------------
 		@count_objects += 1
@@ -409,7 +411,9 @@ class Report_html
 				'vars' => vars,
 				'smps' => samples,
 				'data' => values
-			}
+			},
+			'x' => x,
+			'z' => z
 		}
 		events = false
 		info = false
@@ -442,7 +446,7 @@ class Report_html
 		default_options = {
 			row_names: true			
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
 			config['graphType'] = 'Line'	
 		end
 		return html_string
@@ -452,7 +456,7 @@ class Report_html
 		default_options = {
 			row_names: true,
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
 			config['graphType'] = 'Stacked'	
 		end
 		return html_string
@@ -462,7 +466,7 @@ class Report_html
 		default_options = {
 			row_names: true
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
 			config['graphType'] = 'Bar'
 		end
 		return html_string
@@ -472,7 +476,7 @@ class Report_html
 		default_options = {
 			row_names: true
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
 			config['graphType'] = 'Heatmap'	
 		end
 		return html_string
@@ -483,7 +487,7 @@ class Report_html
 			row_names: true,
 			header: true
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
 			config['graphType'] = 'Boxplot'
 			options[:mod_data_structure] = 'boxplot'
 			if options[:extracode].nil?
@@ -497,7 +501,7 @@ class Report_html
 		default_options = {
 			transpose: false
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
 			config['graphType'] = 'Pie'
 			if samples.length > 1
 				config['showPieGrid'] = true
@@ -514,7 +518,7 @@ class Report_html
 			transpose: false,
 			correlationAxis: 'samples'
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
 			config['graphType'] = 'Correlation'
 			config['correlationAxis'] = default_options[:correlationAxis]
 		end
@@ -526,7 +530,7 @@ class Report_html
 			row_names: false,
 			transpose: false
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
 			config['graphType'] = 'Scatter2D'
 			config['xAxis'] = [samples.first] if config['xAxis'].nil?	
 			config['yAxis']	= samples[1..samples.length-1] if config['yAxis'].nil?
@@ -549,7 +553,7 @@ class Report_html
 			row_names: true,
 			transpose: false
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
 			config['graphType'] = 'ScatterBubble2D'
 			if options[:xAxis].nil?	
 				config['xAxis'] = [samples[0]]
@@ -591,7 +595,7 @@ class Report_html
 			ringsType: [],
 			ringsWeight: []
 		}.merge!(user_options)
-		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id|
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
 			options[:mod_data_structure] = 'circular'
 			config['graphType'] = 'Circular'
 			config['segregateVariablesBy'] = ['Ring']
