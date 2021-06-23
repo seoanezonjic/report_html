@@ -647,6 +647,39 @@ class Report_html
 		end
 	end
 
+	def circular_genome(user_options = {}, &block)
+		default_options = {}.merge!(user_options)
+		coordinates = user_options[:genomic_coordinates]
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
+			config['graphType'] = 'Circular'
+			config["arcSegmentsSeparation"] = 3
+    	config["colorScheme"] = "Tableau"
+    	config["colors"] = ["#332288","#6699CC","#88CCEE","#44AA99","#117733","#999933","#DDCC77","#661100","#CC6677","#AA4466","#882255","#AA4499"]
+			config["showIdeogram"] = true
+			chr = []
+			pos = []
+			tags2remove = []
+			vars.each_with_index do |var, i|
+				coord = coordinates[var]
+				if !coord.nil?
+					tag = coord.first.gsub(/[^\dXY]/,'')
+					if tag == 'X' || tag == 'Y' || (tag.to_i > 0 && tag.to_i <= 22)
+						chr << coord.first.gsub(/[^\dXY]/,'')
+						pos << coord.last - 1
+					else
+						tags2remove << i
+					end
+				else
+					tags2remove << i
+				end
+			end
+			tags2remove.reverse_each{|i| ent = vars.delete_at(i); warn("Feature #{ent} has not valid coordinates")} # Remove entities with invalid coordinates
+			z['chr'] = chr
+			z['pos'] = pos
+		end
+		return html_string
+	end	
+
 	# EMBED FILES
 	###################################################################################
 
