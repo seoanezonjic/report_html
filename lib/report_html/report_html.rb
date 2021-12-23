@@ -472,6 +472,22 @@ class Report_html
 		return html_string
 	end
 
+	def dotplot(user_options = {}, &block)
+		default_options = {
+			row_names: true,
+			connect: false
+		}.merge!(user_options)
+		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
+			config['graphType'] = 'Dotplot'
+			if default_options[:connect]
+				config['dotplotType'] = "stacked"
+				config['connectBy'] = "Connect"
+				z[:Connect] = Array.new(vars.length, 1)
+			end
+		end
+		return html_string
+	end
+
 	def heatmap(user_options = {}, &block)
 		default_options = {
 			row_names: true
