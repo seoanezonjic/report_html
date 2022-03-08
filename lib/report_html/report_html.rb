@@ -137,8 +137,7 @@ class Report_html
 	# DATA MANIPULATION METHODS
 	#-------------------------------------------------------------------------------------	
 	def get_data(options)
-		data = []
-		data = extract_data(options)
+		data, smp_attr, var_attr = extract_data(options)
 		if !data.empty?
 			if @data_from_files # If data on container is loaded using html_report as lib, we don't care about data format
 								# if data comes from files and is loaded as strings. We need to format correctly the data.
@@ -155,9 +154,14 @@ class Report_html
 				end
 			end
 			add_header_row_names(data, options)
-			data = data.transpose if options[:transpose]
+			if options[:transpose]
+				data = data.transpose
+				smp_attr_bkp = smp_attr
+				smp_attr = var_attr
+				var_attr = smp_attr_bkp
+			end
 		end
-		return data
+		return data, smp_attr, var_attr
 	end
 
 	def add_header_row_names(data, options)
@@ -176,6 +180,8 @@ class Report_html
 
 	def extract_data(options)
 		data = []
+		smp_attr = nil
+		var_attr = nil
 		ids = options[:id]
 		fields = options[:fields]
 		ids = ids.split(',') if ids.class == String && ids.include?(',') # String syntax
@@ -193,16 +199,25 @@ class Report_html
 			end
 		else
 			fields = fields.first if fields.class == Array
-			data = extract_fields(ids, options[:fields])
+			smp_attr = process_attributes(extract_fields(ids, options[:smp_attr]), options[:var_attr], aggregated = true) if !options[:smp_attr].nil? && !options[:smp_attr].empty?
+			var_attr = process_attributes(extract_rows(ids, options[:var_attr]), options[:smp_attr], aggregated = false) if !options[:var_attr].nil? && !options[:var_attr].empty?
+			data = extract_fields(ids, options[:fields], del_fields = options[:smp_attr], del_rows = options[:var_attr])
 		end
-		return data
+		return data, smp_attr, var_attr
 	end
 
-	def extract_fields(id, fields)
+	def extract_fields(id, fields, del_fields = [], del_rows = [])
 		data = []
-		@hash_vars[id].each do |row|
+		@hash_vars[id].each_with_index do |row, i|
+			next if !del_rows.nil? && del_rows.include?(i)
 			if fields.empty?
-				data << row.dup # Dup generates a array copy that avoids to modify original objects on data manipulation creating graphs
+				row = row.dup # Dup generates a array copy that avoids to modify original objects on data manipulation creating graphs
+				if !del_fields.nil? 
+					del_fields.sort.reverse_each do |j|
+						row.delete_at(j)
+					end
+				end
+				data << row
 			else
 				data << fields.map{|field| row[field]} #Map without bang do the same than dup
 			end
@@ -210,6 +225,35 @@ class Report_html
 		return data
 	end
 
+	def extract_rows(id, rows)
+		table = @hash_vars[id]
+		data = rows.map{|field| table[field]}
+		return data
+	end
+
+	def process_attributes(attribs, delete_items, aggregated = false)
+		parsed_attr = []
+		if aggregated
+			if !delete_items.nil? && !delete_items.empty?
+				(1..delete_items.length).reverse_each do |ind|
+					attribs.delete_at(1)
+				end
+			end
+			attribs.first.length.times do |i|
+				parsed_attr << attribs.map{|at| at[i]}
+			end
+		else
+			attribs.each do |attrib|
+				if !delete_items.nil? && !delete_items.empty?
+					(1..delete_items.length).reverse_each do |ind|
+						attrib.delete_at(ind)
+					end
+				end
+				parsed_attr << attrib
+			end			
+		end
+		return parsed_attr
+	end
 	# TABLE METHODS
 	#-------------------------------------------------------------------------------------
 	def table(user_options = {}, &block)
@@ -220,13 +264,15 @@ class Report_html
 			add_header_row_names: false,
 			transpose: false,
 			fields: [],
+			smp_attr: [],
+			var_attr: [],			
 			border: 1,
 			cell_align: [],
 			attrib: {}
 		}
 		options.merge!(user_options)
 		table_attr = prepare_table_attribs(options[:attrib])
-		array_data = get_data(options)
+		array_data, _, _ = get_data(options)
 		block.call(array_data) if !block.nil?
 		rowspan, colspan = get_col_n_row_span(array_data)
 		table_id = 'table_' + @count_objects.to_s
@@ -329,7 +375,7 @@ class Report_html
 	def add_sample_attributes(data_structure, options)
 		parsed_sample_attributes = {}
 		options[:sample_attributes].each do |key, col|
-			data = get_data({id: options[:id], fields: [col], text: true})
+			data, _, _ = get_data({id: options[:id], fields: [col], text: true})
 			data.shift if options[:header]
 			parsed_sample_attributes[key] = data.flatten 
 		end
@@ -358,6 +404,9 @@ class Report_html
 		options = {
 			id: nil,
 			fields: [],
+			smp_attr: [],
+			var_attr: [],
+			segregate: [],
 			data_format: 'one_axis',
 			responsive: true,
 			height: '600px',
@@ -386,7 +435,7 @@ class Report_html
 		# Data manipulation
 		#------------------------------------------
 		no_data_string = ERB.new("<div width=\"#{options[:width]}\" height=\"#{options[:height]}\" > <p>NO DATA<p></div>").result(binding)
-		data_array = get_data(options)
+		data_array, smp_attr, var_attr = get_data(options)
 		return no_data_string if data_array.empty?
 		block.call(data_array) if !block.nil?
 		object_id = "obj_#{@count_objects}_"
@@ -402,6 +451,8 @@ class Report_html
 
 		x = {}
 		z = {}
+		add_canvas_attr(x, var_attr) if !options[:var_attr].empty?
+		add_canvas_attr(z, smp_attr) if !options[:smp_attr].empty?
 		yield(options, config, samples, vars, values, object_id, x, z)
 		# Build JSON objects and Javascript code
 		#-----------------------------------------------
@@ -426,6 +477,7 @@ class Report_html
 		end
 		add_sample_attributes(data_structure, options) if !options[:sample_attributes].empty?
 		extracode = "#{options[:extracode]}\n"
+		extracode << segregate_data("C#{object_id}", options[:segregate]) if !options[:segregate].empty?
 		extracode << "C#{object_id}.groupSamples(#{options[:group_samples]})\n" if !options[:group_samples].nil?
 		plot_data = "
 		var data = #{data_structure.to_json};
@@ -440,6 +492,27 @@ class Report_html
 	        responsive = "responsive='true'" if options[:responsive]
 		html = "<canvas  id=\"#{object_id}\" width=\"#{options[:width]}\" height=\"#{options[:height]}\" aspectRatio='1:1' #{responsive}></canvas>"
 		return ERB.new(html).result(binding)
+	end
+
+	def segregate_data(obj_id, segregate)
+		string =""
+		segregate.each do |data_type, names|
+			if data_type == :var
+				string << "#{obj_id}.segregateVariables(#{names.inspect});\n"
+			elsif data_type == :smp
+				string << "#{obj_id}.segregateSamples(#{names.inspect});\n"
+			end
+		end
+		return string
+	end
+
+	def add_canvas_attr(hash_attr, attr2add)
+		attr2add.each do |attrs|
+			attr_name = attrs.shift
+			canvas_attr = []
+			attrs.each{|at| canvas_attr << "#{attr_name} : #{at}" }
+			hash_attr[attr_name] = canvas_attr
+		end
 	end
 
 	def line(user_options = {}, &block)
@@ -633,7 +706,7 @@ class Report_html
 			end
 			if !default_options[:links].nil?
 				if !@hash_vars[default_options[:links]].nil? && !@hash_vars[default_options[:links]].empty?
-					link_data = get_data({id: default_options[:links], fields: [], add_header_row_names: false, text: true, transpose: false}) 
+					link_data, _, _ = get_data({id: default_options[:links], fields: [], add_header_row_names: false, text: true, transpose: false}) 
 					config['connections'] = assign_rgb(link_data)
 				end
 			end
