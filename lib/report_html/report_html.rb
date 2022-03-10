@@ -451,8 +451,8 @@ class Report_html
 
 		x = {}
 		z = {}
-		add_canvas_attr(x, var_attr) if !var_attr.empty? && !var_attr.empty?
-		add_canvas_attr(z, smp_attr) if !smp_attr.empty? && !smp_attr.empty?
+		add_canvas_attr(x, var_attr) if !var_attr.nil? && !var_attr.empty?
+		add_canvas_attr(z, smp_attr) if !smp_attr.nil? && !smp_attr.empty?
 		yield(options, config, samples, vars, values, object_id, x, z)
 		# Build JSON objects and Javascript code
 		#-----------------------------------------------
