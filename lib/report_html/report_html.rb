@@ -578,12 +578,44 @@ class Report_html
 		}.merge!(user_options)
 		html_string = canvasXpress_main(default_options, block) do |options, config, samples, vars, values, object_id, x, z|
 			config['graphType'] = 'Boxplot'
-			options[:mod_data_structure] = 'boxplot'
-			if options[:extracode].nil?
+			if default_options[:group].nil?
+				options[:mod_data_structure] = 'boxplot'
+			else
+				config["groupingFactors"] = ['factor', default_options[:group]]
+				config["colorBy"] = 'factor'
+                config["segregateSamplesBy"] = [default_options[:group]]
+				reshape(samples, vars, x, values)
+			end
+			if options[:extracode].nil? && default_options[:group].nil?
 				options[:extracode] = "C#{object_id}.groupSamples([\"Factor\"]);"
 			end
 		end
 		return html_string
+	end
+
+	def reshape(samples, vars, x, values)
+		item_names = samples.dup
+		(vars.length - 1).times do |n|
+			samples.concat(item_names.map{|i| i+"_#{n}"})
+		end
+		x.each do |factor, annotations|
+			current_annotations = annotations.dup
+			(vars.length - 1).times do 
+				annotations.concat(current_annotations)
+			end
+		end
+		series_annot = []
+		vars.each do |var|
+			item_names.each do 
+				series_annot << var
+			end
+		end
+		x['factor'] = series_annot
+		vars.select!{|v| v.nil?}
+		vars << 'vals'
+		vals = values.flatten
+		values.select!{|v| v.nil?}
+		values << vals
 	end
 
 	def pie(user_options = {}, &block) 
