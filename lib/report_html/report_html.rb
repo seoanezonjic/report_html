@@ -581,10 +581,20 @@ class Report_html
 			if default_options[:group].nil?
 				options[:mod_data_structure] = 'boxplot'
 			else
-				config["groupingFactors"] = ['factor', default_options[:group]]
-				config["colorBy"] = 'factor'
-                config["segregateSamplesBy"] = [default_options[:group]]
-				reshape(samples, vars, x, values)
+				if default_options[:group].class == String
+					reshape(samples, vars, x, values)
+					group = default_options[:group]
+					series = 'factor'
+				else
+					series, group = default_options[:group]
+				end
+				if group.nil?
+					config["groupingFactors"] = [series]
+				else
+					config["groupingFactors"] = [series, group]
+				end
+				config["colorBy"] = series
+                config["segregateSamplesBy"] = [group] if !group.nil?
 			end
 			if options[:extracode].nil? && default_options[:group].nil?
 				options[:extracode] = "C#{object_id}.groupSamples([\"Factor\"]);"
