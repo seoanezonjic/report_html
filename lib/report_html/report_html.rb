@@ -588,13 +588,15 @@ class Report_html
 				else
 					series, group = default_options[:group]
 				end
-				if group.nil?
-					config["groupingFactors"] = [series]
-				else
-					config["groupingFactors"] = [series, group]
+				if !config["groupingFactors"].nil? # if config is defined, we assume that the user set this property to the value that he/she desires
+					if group.nil?
+						config["groupingFactors"] = [series]
+					else
+						config["groupingFactors"] = [series, group]
+					end
 				end
-				config["colorBy"] = series
-                config["segregateSamplesBy"] = [group] if !group.nil?
+				config["colorBy"] = series if !config["colorBy"].nil?
+                config["segregateSamplesBy"] = [group] if !group.nil? && !config["segregateSamplesBy"].nil?
 			end
 			if options[:extracode].nil? && default_options[:group].nil?
 				options[:extracode] = "C#{object_id}.groupSamples([\"Factor\"]);"
