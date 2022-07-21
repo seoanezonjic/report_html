@@ -509,9 +509,7 @@ class Report_html
 	def add_canvas_attr(hash_attr, attr2add)
 		attr2add.each do |attrs|
 			attr_name = attrs.shift
-			canvas_attr = []
-			attrs.each{|at| canvas_attr << "#{attr_name} : #{at}" }
-			hash_attr[attr_name] = canvas_attr
+			hash_attr[attr_name] = attrs
 		end
 	end
 
