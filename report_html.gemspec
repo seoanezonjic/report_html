@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["seoanezonjic@hotmail.com"]
 
   spec.summary       = %q{Gem to build html interactive reports.}
-  spec.description   = %q{Html reports based on erb, HTML5 and javascript libraries.}
+  spec.description   = %q{iDEPRECATED PROJECT. MIGRATED TO PYTHON: https://github.com/seoanezonjic/py_report_html\n.Html reports based on erb, HTML5 and javascript libraries.}
   spec.homepage      = ""
   spec.license       = "MIT"
 
